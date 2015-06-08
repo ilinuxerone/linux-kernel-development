@@ -36,17 +36,16 @@ static int __init proc_init(void)
     dirp = proc_mkdir("mydir2", NULL);
     if (!dirp)
     {
-        remove_proc_entry("/proc/mydir2", NULL);
         printk("<0>ERROR: Couldn't create /proc/mydir2");
-        return -1;
+        return -EFAULT;
     }
 
     filep = create_proc_entry("proctest", 0666, dirp);
     if (!filep)
     {
-        remove_proc_entry("/proc/mydir2/proctest", dirp);
+        remove_proc_entry("/proc/mydir2", NULL);
         printk("<0>ERROR: Couldn't create /proc/mydir2/proctest");
-        return -1;
+        return -EFAULT;
     }
 
     filep->proc_fops = &my_file_ops;
