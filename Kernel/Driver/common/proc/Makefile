@@ -1,5 +1,5 @@
 ifneq (${KERNELRELEASE},)
-	obj-m		:=   proc.o   proc_ext.o
+	obj-m		:=   proc.o   proc_ext.o  sysctl.o
 else
  	PWD		:= `pwd`
 	KVER		:= `uname -r`
