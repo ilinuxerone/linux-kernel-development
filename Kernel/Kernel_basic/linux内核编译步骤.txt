@@ -1,0 +1,115 @@
+ linux内核编译步骤      
+对于linux新手来说，编译内核相对有一些难度，甚至不知道如何入手，我通过在网上收集这方面的资料,最终编译成功.现在 
+我归纳了一下，写出这一篇还算比较详细的步骤，希望能对各位新手有一些 
+帮助。 
+1、  准备工作
+（1）       整理出系统需要支持的硬件、文件系统类型以及网络协议等内容。
+（2）       建议用命令uname –r 查看一下系统的版本号，如果你的系统版本与将要编译的内核版本一致，建议将/lib/modules下的内容备份，否则将来的make modules_install 步骤产生的文件会覆盖这个路径下的内容。
+（3）       A:下载并解压linux内核，建议从http://www.kernel.org/pub/linux/kernel/ 下载内核，因为安装系统时所安装的源代码默认情况下支持很多设备，这样给内核裁减增加了难度。以下假设你已经下载了内核的为linux-x-y-z.tar.gz。一般都将linux内核源代码放在/usr/src下，这里仍然遵守这个习惯，如果你的这个路径下已经存在这个版本的内核，建议将已有的改个名称。
+
+            B:如果内核已经安装（/usr/src/目录有linux子目录），跳过如果没有安装，在光驱中放入linux安装光盘，找到kernel-source-2.xx.xx.rpm文件（xx代表数字，表示内核的版本号）, 比如RedHat linux的RPMS目录是/RedHat/RPMS/目录，然后使用命令rpm -ivh kernel-source-2.xx.xx.rpm安装内核 
+
+2、清除从前编译内核时残留的.o 文件和不必要的关联  
+cd /usr/src/linux 
+make clean 移除生成的文件，保存config文件
+make mrproper 
+			确保源代码目录下没有不正确的.o文件、文件依赖关系和config文件，执行该命令后，内核选项会回到默认的状态下。如果你是下载的内核源码，而且是第一次编译，就没有必要执行这一步操作
+make distclean  移除生成的.o文件、config文件和patch文件 
+	
+3、配置内核，修改相关参数，请参考其他资料 
+在图形界面下，make xconfig（需要安装图形化系统）；
+字符界面下，make menuconfig (推荐使用)
+在内核配置菜单中正确设置个内核选项，保存退出 
+成功后会生成一个隐藏的.config配置文件。
+
+配置菜单中的项该怎么选择？
+在内核源码中boot/目录下有针对不同平台默认的以config-开头的配置文件。
+可以参考此目录下的文件，进行定制配置。
+
+4、正确设置关联文件 
+make dep 
+    根据上一步所选择的选项，建立文件的依赖关系。
+5、make clean
+清理一些不必要的文件，如果你在上次编译的基础上，删去了一些选项，建议你执行这一步操作，否则，就没有必要了。
+
+6、编译内核 
+对于大内核（比如需要SCSI支持），make bzImage 
+对于小内核，make zImage   小与512K
+
+补充选项
+-V=1 显示编译信息
+
+7、编译模块 
+make modules 
+编译可加载模块（即内核选项中选择为M的选项），编译时间跟M选项的数量有关。
+
+8、安装模块 
+make modules_install 
+   即将编译好的modules拷贝到/lib/modules下，这就是为什么在“准备工作”的第三步提醒你备份的原因了。
+
+9、使用新内核
+方法一: 
+(1)更换内核:A、mv /usr/src/linuxX.X.X/system.map    /boot/system.map
+            B、mv /usr/src/linuxX.X.X/arch/i386/boot/bzImage   /boot/vmlinuz
+（2）然后修改/etc/lilo.conf文件，加一个启动选项，使用新内核bzImage/zImage启动。格式如下： 
+boot=/dev/hda 
+map=/boot/map 
+install=/boot/boot.b 
+prompt 
+timeout=50 
+linear 
+default=linux-new    ### 告诉lilo缺省使用新内核启动linux ### 
+append="mem=256M" 
+
+image=/boot/vmlinuz-2.2.14-5.0 
+        label=linux 
+        read-only 
+        root=/dev/hda5 
+
+image=/boot/bzImage(zImage) 
+        label=linux-new 
+        read-only 
+        root=/dev/hda5 
+
+保留旧有的启动选项可以保证新内核不能引导的情况，还可以进入linux进行其他操作。 
+
+保存退出后，不要忘记了最重要的一步，运行/sbin/lilo,使修改生效 
+方法二:使用GRUB(修改grub.conf文件)
+(1)更换内核:A、mv /usr/src/linuxX.X.X/system.map    /boot/system.map
+            B、mv /usr/src/linuxX.X.X/arch/i386/boot/bzImage   /boot/vmlinuz
+(2)修改引导管理程序Grub，/etc/grub.conf
+内容如下：
+#boot =/dev/had
+default =0
+timeout =10
+splashimage =(hd0, 0)/grub/splash.xpm.gz
+title Red Hat Linux(2.4.20-8)
+   root(hd0, 0)
+   kernel /vmlinuz -2.4.20-8  ro root =LABEL =/
+   initrd /initrd-2.4.20-8.img
+方法三：修改启动配置文件
+现在大多数使用的都是grub启动，需要修改/boot/grub/grub.conf，添加相应的启动信息，添加内容的最简单格式如下：
+title 显示在启动菜单上的名称
+root 根文件系统挂载分区
+kernel 压缩过的内核文件名
+initrd 根文件系统文件名
+              如：
+              title My new kernel
+              root (hd0,2)
+              kernel /boot/vmlinuz-x.y.z
+              initrd /boot/initrd-x.y.z.img
+10、重新生成ram磁盘 
+如果您的系统中的/etc/lilo.conf没有使用了ram磁盘选项initrd,略过 
+如果您的系统中的/etc/lilo.conf使用了ram磁盘选项initrd, 
+使用mkinitrd initrd-内核版本号 内核版本号命令重新生成ram磁盘文件，例如我的Redhat 6.2： 
+mkinitrd initrd-2.2.14-5.0 2.2.14-5.0 
+之后把/etc/lilo.conf中的initrd指向新生成的initrd-2.2.14-5.0文件： 
+initrd=/boot/initrd-2.2.14-5.0 
+
+ram磁盘能使系统性能尽可能的优化，具体参考/usr/src/linux/Documents/initrd.txt文件 
+
+补充：
+mkinitrd的替代工具
+dracut  new.img   /lib/modules目录下的指定的一个版本的内核模块目录
+
+11、重新启动,OK! 
