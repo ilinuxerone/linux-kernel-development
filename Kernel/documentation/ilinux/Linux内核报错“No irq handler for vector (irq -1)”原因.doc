@@ -1,0 +1,49 @@
+
+系统运行过程中，报告错误“kernel:do_IRQ: 5.218 No irq handler for vector (irq -1)”。从错误打印来看，是中断向量-1没有中断处理程序。
+我们来看一下该错误语句来源，在Linux中断处理函数do_IRQ（）函数中打印（243～244行）。
+ 
+00226: unsigned int __irq_entry do_IRQ(struct pt_regs *regs)
+00227: {
+00228:         struct pt_regs *old_regs = set_irq_regs(regs);
+00229:
+00230:         /* high bit used in ret_from_ code*/
+00231:         unsigned vector = ~regs->orig_ax;
+00232:         unsigned irq;
+00233:
+00234:         exit_idle();
+00235:         irq_enter();
+00236:
+00237:         irq = __get_cpu_var(vector_irq)[vector];
+00238:
+00239:         if (!handle_irq(irq, regs)){
+00240:                 ack_APIC_irq();
+00241:
+00242:                 if (printk_ratelimit())
+00243:                         pr_emerg(“%s:%d.%d No irq handler for vector (irq %d)\n“,
+00244:                     func__, smp_processor_id(), vector, irq);
+
+00245:         }
+00246:
+00247:         irq_exit();
+00248:
+00249:         set_irq_regs(old_regs);
+00250:         return 1;
+00251: }?   enddo_IRQ
+
+   从do_IRQ（）函数中的打印语句可以看出，“5.218 No irq handler for vector (irq -1)”表示CPU 5上，收到中断向量218的中断，但解析到的中断号为0xffffffff。显然物理中断号0xffffffff并不存在。那么是什么原因，使内核解析到的物理中断号irq为0xffffffff？
+
+ 内核是通过从vector_irq变量中获取中断向量对应的物理中断号（237行），也就是__get_cpu_var(vector_irq)[vector]得到的值为0xffffffff，说明内核中并没有中断向量218。
+
+ 这样，内核报错“No irq handler for vector (irq -1)”原因就是do_IRQ（）收到了内核并不存在的中断向量218发来的中断。
+
+  我们接下来继续分析收到内核并不存在中断向量218发来的中断原因。驱动程序加载时，通过request_irq（）来注册中断处理程序。request_irq（）会给物理中断号irq分配一个中断向量vector。这样中断处理程序do_IRQ（）就可以根据收到的vector，识别出真正发生中断的物理中断号irq。
+
+  驱动卸载时，调用free_irq（）释放中断资源，但仍需调用pci_disable_device（）来关闭PCI设备。若不调用pci_disable_device（），则request_irq（）中申请到的中断向量vector与该PCI设备对应关系，可能不会被解除。于是当再次加载该PCI设备驱动后，PCI设备发出中断，内核仍然会以旧的中断向量vector来解析中断号。但此时vector是第一次驱动加载时，内核分配的vector；而驱动卸载调用free_irq（）将vector与物理中断号irq对应关系解除。于是解析到的irq为0xffffffff。
+
+ 故障原因：
+
+    驱动卸载函数中，忘记调用pci_disable_device（）函数来关闭PCI设备。
+
+  解决办法：
+
+   驱动卸载函数结束前，调用pci_disable_device（）函数来关闭PCI设备。

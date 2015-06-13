@@ -1,0 +1,8 @@
+在运行程序时，我们希望程序到指定路径搜索动态库。方法是设置LD_LIBRARY_PATH环境变量即可。
+
+环境变量LD_LIBRARY_PATH所指明的路径。
+
+缺省的路径：/lib和/usr/lib 
+/etc/ld.so.conf中指明的路径。
+
+实例：#export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/chen/Downloads/diskdiag-1.0.0/x86_64/lib64/
