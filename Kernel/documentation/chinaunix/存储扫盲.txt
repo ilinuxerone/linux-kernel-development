@@ -1,0 +1,39 @@
+计算机存储层次结构
+---- 
+CPU| Cache |  Memory | Hard Disk
+----
+cache--->disk存储速度依次递减，容量递增
+
+存储技术
+	IDE ( lnte伊ted Drive Electronics. 集成驱动电子设备〉是PC中常见的存储接口技术. ATA(Advanced Technology Attachment. 高级技术配件)则是相关规范的官方名称。CD-ROM和磁带等存储设备则使用一种称为ATAPI ( ATA Packet Interface， ATA包接口)的特殊协议与标准IDE电缆相连接，ATAPI是在ATA-4中引入的.
+	IDE/ATA是一种并行总线技术(有时称为并行ATA或PATA ).SATA ( Serial ATA. 串行ATA ) 是由PATA发展而来的现代串行总统技术.
+	SCSI (Small Computer System I nterface . 小型计算机系统接口)是服务器和高端工作站选用的一种存储技术， SCSI 比SATA要快一点.SCSI传统上是种并行接一并行口标准，但是像ＡＴＡ一样，随着ＳＡＳ总线技术的发展也在转向串行操作。
+内核的SCSl子系统在结构1 :分为3层: 介质(如磁盘、CD-ROM和磁带〉所对应的顶层驱动程序:扫描SCSI总线或配置设备的中间层:底层主机适配器驱动程序。
+
+ＤＡＳ（Ｄｉｒｅｃｔ　Ａｔｔａｃｈｅｄ　Ｓｔｏｒａｇｅ）
+
+－－－－－－－－－－－－
+	app
+-----------------------
+         VFS
+-----------------------
+。。。。。。。。。。。。。。。。。。 
+ext3  |  VFAT |  ...
+-----------------------
+       generic block 1)
+-------------------- -
+IO elevator and scsi command 2)	
+-----------------------			SCSI  System  :3层架构
+。。。。。。。。。。。。。。。。。。
+      SCSI Adapter device driver 3)
+-----------------------
+       SCSI Hard Disk
+
+SAN：
+为了扩容，正常能想到增加磁盘数量，但是每台主机接口有限，通过增加主机的方式来增加磁盘容量是不经济的。
+因此，我们想到可以再服务器主机上增加一个SCSI HBA ，通过HAB来扩充磁盘容量。由于客户端主机是通过网络远程来访问服务器本地磁盘的。因此我们需要在上面服务器 端的层次结构上SCSI Adapter device driver上增加一层，来屏蔽是通过本地或者通过远程访问的差异。
+
+NAS：
+除了上面一种方式外，还可以在VFS层下添加一个文件系统来支持对磁盘容量扩充的功能。支持分布式磁盘管理。
+1:HDFS
+2:Glusterfs
