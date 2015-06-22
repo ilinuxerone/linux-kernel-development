@@ -1,1 +1,0 @@
-cmd_/mnt/hgfs/H/swap/guoqian/LDD/chrdev/chardev_v1.3/memdev.ko.unsigned := ld -r -m elf_i386 -T /usr/src/kernels/2.6.32-71.el6.i686/scripts/module-common.lds --build-id -o /mnt/hgfs/H/swap/guoqian/LDD/chrdev/chardev_v1.3/memdev.ko.unsigned /mnt/hgfs/H/swap/guoqian/LDD/chrdev/chardev_v1.3/memdev.o /mnt/hgfs/H/swap/guoqian/LDD/chrdev/chardev_v1.3/memdev.mod.o 
