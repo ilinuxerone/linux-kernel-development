@@ -1,0 +1,1 @@
+cmd_/home/kylin/LDD/platform/platform_davice.ko := ld -r -m elf64_sparc -T /usr/src/kernels/2.6.32.20-15.8.201212.ky3.sparcv9/scripts/module-common.lds --build-id -o /home/kylin/LDD/platform/platform_davice.ko /home/kylin/LDD/platform/platform_davice.o /home/kylin/LDD/platform/platform_davice.mod.o

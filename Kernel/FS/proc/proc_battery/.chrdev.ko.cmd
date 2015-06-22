@@ -1,0 +1,1 @@
+cmd_/home/kylin/chrdev3.1-final/proc_battery/chrdev.ko := ld -r -m elf64_sparc -T /usr/src/kernels/2.6.32.20-15.8.201212.ky3.sparcv9/scripts/module-common.lds --build-id -o /home/kylin/chrdev3.1-final/proc_battery/chrdev.ko /home/kylin/chrdev3.1-final/proc_battery/chrdev.o /home/kylin/chrdev3.1-final/proc_battery/chrdev.mod.o

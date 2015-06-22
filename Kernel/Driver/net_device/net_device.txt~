@@ -1,0 +1,243 @@
+//网络协议接口层
+//套接字缓冲区struct sk_buff
+#include <linux/skbuff.h>
+struct sk_buff {
+	struct net_device  *rx_dev;
+	struct net_device  *dev;
+	
+	union {}h;    //指向数据包各个层的数据 包头。h指向传输层包头
+	union {}nh;   //网络层包头
+	union {}man;  //链路层包头
+	
+	unsigned  char *head;
+	unsigned  char  *data;
+	unsigned  char *tail;
+	unsigned  char  *end;
+	
+	unsigned long  len; 
+	unsigned  char ip_summed;
+	unsigned  char  pkt_type;
+};
+
+PACKET_HOST  
+PACKET_BROADCAST
+PACKET_MULTICAST
+PACKET_OTHERHOST
+
+struct sk_buff *alloc_skb(unsigned int len, int priority);
+struct sk_buff *dev_alloc_skb(unsigned int len);
+
+void kfree_skb(struct sk_buff *skb);
+void dev_kfree_skb(struct sk_buff *skb);
+
+unsigned char *skb_put(struct sk_buff *skb, int len);  //这个函数会进行检查
+unsigned char *__skb_put(struct sk_buff *skb, int len);  //不进行检查
+
+unsigned char *skb_push(struct sk_buff *skb, int len);
+unsigned char *__skb_push(struct sk_buff *skb, int len); //缓冲区头部添加数据
+
+int skb_tailroom(struct sk_buff *skb);  //返回缓冲区后部可用空间总量
+int skb_headroom(struct sk_buff *skb);  //返回缓冲区前面部分可用空间总量
+
+void  skb_reserve(struct sk_buff *skb, int len);//在可填充缓冲区之前保留包头
+unsigned char *skb_pull(struct sk_buff *skb, int len); 
+//从数据包头拿出数据，通常用来剥离数据包头
+
+//网络设备接口层
+struct net_device
+#include  <linux/netdevice.h>
+net_device 结构可分为
+1. 全局成员
+2. 硬件相关成员
+2. 接口相关成员
+4. 设备方法成员
+5. 公用成员
+
+全局信息
+char  name[IFNAMESIZ];
+int  (*init)(struct net_device *dev);
+硬件信息
+unsigned long rmem_end;
+unsigned long rmem_start;
+unsigned long mem_start;
+unsigned long mem_end;     //这些字段描述设备共享内存的起止地址
+usnigned long base_addr;  //IO地址
+usnigned char irq;        //中断号
+unsigned char if_port;    //端口
+usnigned char dma;         //设备的DMA通道
+
+接口信息
+int (*open)(struct net_device *dev);
+打开接口：
+当ifconfig激活网络设备时，接口被打开。
+通常在open方法里完成资源的分配，包括IO映射，中断注册，DMA注册等。
+同时激活硬件，并增加使用计数。
+
+int (*stop)(struct net_device *dev);
+这里完成相反的工作
+
+int (*hard_start_xmit)(struct sk_buff *skb, struct net_device *dev);
+//很重要的一个方法
+
+int (*do_ioctl)(struct net_device *dev, struct ifreq *ifr, int cmd);
+int (*set_mac_address)(struct net_device *dev, void *addr);
+
+..........................
+..........................
+
+网络设备的注册注销
+int register_netdev(struct net_device *dev);
+void unregister_netdev(struct net_device *dev);
+分配net_device 
+struct net_device *alloc_netdev(int sizeof_prio, const char *name
+				void (*setup)(struct net_device *));
+struct net_device *alloc_etherdev(int sizeof_prio);
+
+释放net_device
+void free_netdev(struct net_device *dev);
+ 
+
+网络设备的注册， 注销
+int xxx_init_module(void)
+{
+	......
+	xxx_dev = alloc_netdev(sizeof(struct xxx_priv), "sn%d", xxx_init);
+	if (xxx_dev == NULL){
+	
+	}
+	
+	if ((result = register_netdev(xxx_dev))){
+	
+	}
+	
+	void xxx_cleanup(void)
+	{
+		unregister_netdev(xxx_dev);
+		free_netdev(xxx_dev);
+	}
+}
+
+网络设备的打开与释放
+打开函数工作：
+1 使能设备使用的硬件资源，申请IO区域， 中断和DMA通道等
+2 调用linux内核提供的netif_start_queue()激活设备发送队列
+
+网络设备的关闭操作工作：
+1 调用linux内核提供的netif_stop_queue()停止设备传输包
+2 释放设备使用的IO区域，中断， 和DMA资源
+
+void netif_start_queue(struct net_device *dev);
+void netif_stop_queue(struct net_device *dev);
+
+int xxx_open(struct net_device *dev)
+{
+	ret = request_irq(dev->ifq, &xxx_interrupt, 0, dev->name, dev);
+	if (ret){
+	
+	}
+	
+	netif_start_queue(dev);
+	............
+}
+
+int xxx_release(strcut net_device *dev)
+{
+	free_irq(dev->irq, dev);
+	...........
+	netif_stop_queue(dev);
+	
+	............
+}
+
+网络设备驱动完成数据包发送的流程如下：
+1 网络设备驱动程序从上层协议传递过来的sk_buff参数获得数据包的有效数据和长度
+将有效数据放入临时缓冲区。
+2 对于以太网，如果有效数据的长度小于以太网冲突检测所要求帧的最小长度
+ETH_ZLEN, 则给临时缓冲区的末尾填充0.
+3 设置硬件的寄存器， 驱使设备进行数据发送操作。
+
+int xxx_tx(struct sk_buff *skb, struct net_device *dev)
+{
+	int len;
+	char *data, shortpkt[ETH_ZLEN];
+	data = skb->data;
+	len = skb->len;
+	if (len < ETH_ZLEN){
+		memset(shortpkt, 0, ETH_ZLEN);
+		memcpy(shortpkt, skb->data, skb->len);
+		len = ETH_ZLEN;
+		data = shortpkt;
+	}
+	
+	dev->trans_start = jiffies;
+	.....
+	xxx_hw_tx(data, len, dev);
+	..................
+}
+
+//传输超时处理
+当数据传输超时时，意味着当前的发送操作失败。
+此时，数据包发送超时处理函数xxx_tx_timeout将被调用。
+这个函数需要调用linux内核提供的netif_wake_queue()函数重新启动设备发送队列。
+如下所示：
+void xxx_tx_timeout(struct net_device *dev)
+{
+	......
+	netif_wake_queue(dev);
+}
+
+数据包接受
+是由中断引发设备的中断处理函数
+
+中断处理函数判断中断类型：
+1 如果为接受中断，则读取接受到的数据，分配sk_buff数据结构和数据缓冲区
+2 将接受到的数据复制到缓冲区， 并调用netif_rx()函数将sk_buff传递给上层协议
+
+	
+static  void xxx_interrupt(int ifq, void *dev_id, struct pt_regs *regs)
+{
+	..............
+	switch (status & ISQ_EVENT_MASK){
+	case ISQ_RECEIVER_EVENT: 
+		xxx_rx(dev);
+		break;
+	/*其他类型中断*/
+	}
+}
+
+static void xxx_rx(struct xxx_device *dev)
+{
+	...............
+	length = get_rev_len(...);
+	skb = dev_alloc_skb(len + 2);
+	skb = reserve(skb, 2);
+	skb->dev = dev;
+	/*读取硬件接受到的数据*/
+	
+	/*获取上层协议类型*/
+	skb->protocol = eth_type_trans(skb, dev);
+	netif_rx(skb);       ///////
+	dev->last_rx = jiffies;
+	.......................
+}
+
+网络连接状态
+
+网络适配器硬件电路可以检测出链路上是否有载波，载波反应了网络的连接是否正常。
+网络设备驱动可以通过 如下函数通知网络的连接状态：
+void netif_carrier_on(struct net_device *dev);
+void netif_carrier_off(struct net_device *dev);
+int netif_carrier_ok(struct net_device *dev);
+
+网络设备驱动程序中往往设置一个定时器来对链路状态进行周期性检查，
+当定时器到期之后，在定时器处理函数中读取物理设备的相关寄存器获得载波状态
+从而更新设备的连接状态。
+
+参数设置和统计数据
+参数设置通过ioctl（）函数设置
+统计函数： 
+struct net_device_stats  *xxx_stats(struct net_device *dev)
+{
+	struct xxx_priv *priv = netdev_priv(dev);
+	return &priv->stats;
+}
